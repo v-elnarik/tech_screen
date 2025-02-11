@@ -7,14 +7,17 @@ WORKDIR /app
 # Копируем файлы проекта внутрь контейнера
 COPY . .
 
-# Устанавливаем зависимости (сначала копируем requirements.txt, затем устанавливаем)
+# Устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Указываем переменные окружения (при необходимости, они могут быть переопределены в Render)
-ENV DATABASE_URL=postgresql+psycopg2://postgres:123@db:5432/Tech_screen
 
 # Открываем порт 8000 для взаимодействия с FastAPI
 EXPOSE 8000
 
-# Команда, которая запускает сервер FastAPI
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"] && python bot.py
+# Устанавливаем Supervisor
+RUN pip install supervisor
+
+# Копируем конфигурацию Supervisor
+COPY supervisord.conf /etc/supervisord.conf
+
+# Запускаем Supervisor
+CMD ["supervisord", "-c", "/etc/supervisord.conf"]
