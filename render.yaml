@@ -3,12 +3,13 @@ services:
     name: fastapi-app
     env: docker
     repo: https://github.com/v-elnarik/tech_screen
-    region: oregon  # Можно изменить регион, если нужно
+    region: oregon
     plan: free
     envVars:
       - key: DATABASE_URL
         value: postgresql+psycopg2://postgres:123@db:5432/Tech_screen
       - key: TELEGRAM_BOT_TOKEN
-        sync: false  # Этот токен ты можешь добавить вручную в Render
-    dockerfilePath: ./Dockerfile
+        sync: false
+    dockerContext: .
+    dockerfilePath: Dockerfile
     autoDeploy: true
