@@ -8,6 +8,7 @@ WORKDIR /app
 COPY . .
 
 # Устанавливаем зависимости
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Открываем порт 8000 для взаимодействия с FastAPI
