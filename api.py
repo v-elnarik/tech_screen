@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from db import SessionLocal, TestResult, Question, Base, engine
 from pydantic import BaseModel
@@ -11,9 +12,15 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="HR API для технического скрининга")
 
+CAT_GIF_URL = "https://media.giphy.com/media/v6aOjy0Qo1fIA/giphy.gif"
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url=CAT_GIF_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
