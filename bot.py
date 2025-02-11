@@ -1,40 +1,37 @@
 import os
 import logging
 import asyncio
-import threading
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from fastapi import FastAPI
 from dotenv import load_dotenv
+import threading
 import uvicorn
 
-# === Настройка логирования ===
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Настройка логирования
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# === Загрузка переменных окружения ===
+# Загрузка переменных окружения
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-if TOKEN:
-    logging.info(f"✅ TELEGRAM_BOT_TOKEN загружен, длина: {len(TOKEN)} символов")
-else:
-    logging.error("❌ Ошибка: TELEGRAM_BOT_TOKEN не найден! Проверь переменные окружения.")
+# Проверяем, загружен ли токен
+if not TOKEN:
+    logging.error("❌ TELEGRAM_BOT_TOKEN не найден! Проверь переменные окружения.")
     raise ValueError("TELEGRAM_BOT_TOKEN не найден в переменных окружения!")
+logging.info(f"✅ TELEGRAM_BOT_TOKEN загружен, длина: {len(TOKEN)} символов")
 
-# === Инициализация бота и диспетчера ===
+# Инициализация бота и диспетчера (без аргументов!)
 try:
     bot = Bot(token=TOKEN)
-    dp = Dispatcher()  # aiogram 3.x
+    dp = Dispatcher()  # В aiogram v3 Dispatcher создается БЕЗ аргументов
     logging.info("✅ Бот успешно инициализирован.")
 except Exception as e:
     logging.error(f"❌ Ошибка инициализации бота: {e}")
     raise
 
-# === Обработчик команды /start ===
+# Регистрация обработчика
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
     logging.info(f"✅ Получена команда /start от пользователя {message.from_user.id}")
@@ -46,30 +43,28 @@ async def start_command(message: types.Message):
         reply_markup=keyboard
     )
 
-# === Создаем FastAPI-приложение ===
+# FastAPI-приложение
 app = FastAPI()
 
 @app.get("/")
 async def root():
     return {"status": "OK", "message": "FastAPI работает"}
 
-# === Функция для запуска polling бота (aiogram 3.x) ===
+# Функция запуска бота (aiogram v3)
 async def start_bot():
     try:
         logging.info("🚀 Запуск бота...")
-        await bot.delete_webhook(drop_pending_updates=True)  # Чистим очередь сообщений
         await dp.start_polling(bot)
     except Exception as e:
         logging.error(f"❌ Бот завершился с ошибкой: {e}")
         raise
 
-# === Запуск FastAPI и бота ===
 if __name__ == "__main__":
     logging.info("🔥 Стартуем FastAPI и бота...")
 
-    # Запуск бота в отдельном потоке
+    # Запускаем бота в фоне
     bot_thread = threading.Thread(target=asyncio.run, args=(start_bot(),), daemon=True)
     bot_thread.start()
-
-    # Запуск FastAPI
+    
+    # Запускаем FastAPI через uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
