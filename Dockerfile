@@ -17,4 +17,4 @@ ENV DATABASE_URL=postgresql+psycopg2://postgres:123@db:5432/Tech_screen
 EXPOSE 8000
 
 # Команда, которая запускает сервер FastAPI
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"] && python bot.py
