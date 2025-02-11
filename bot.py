@@ -10,13 +10,13 @@ import threading
 import uvicorn
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Загрузка переменных окружения
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# Логируем длину токена для проверки
+# Проверяем, загружен ли токен
 if TOKEN:
     logging.info(f"✅ TELEGRAM_BOT_TOKEN загружен, длина: {len(TOKEN)} символов")
 else:
@@ -40,7 +40,7 @@ async def start_command(message: types.Message):
         [InlineKeyboardButton("Начать тест", web_app=WebAppInfo(url="https://your-web-app-url.com"))]
     ])
     await message.answer(
-        "Привет! Это бот для технического скрининга.\nНажми кнопку ниже, чтобы начать тест.",
+        "Привет! Это бот для технического скрининга.\\nНажми кнопку ниже, чтобы начать тест.",
         reply_markup=keyboard
     )
 
