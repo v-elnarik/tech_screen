@@ -7,9 +7,9 @@ services:
     plan: free
     envVars:
       - key: DATABASE_URL
-        value: postgresql+psycopg2://postgres:123@db:5432/Tech_screen
+        value: postgresql://tech_screen_db_user:kgnGuXbvzkNxCxzr8JF9PpRFdcI5t2Uh@dpg-culgleggph6c73dc5pr0-a/tech_screen_db 
       - key: TELEGRAM_BOT_TOKEN
-        sync: false
+        sync: 7931899712:AAFllcMuoFxbAaZjkerYxMXp5__tpbLqPX8
     dockerContext: .
     dockerfilePath: Dockerfile
     autoDeploy: true
