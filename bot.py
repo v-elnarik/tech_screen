@@ -98,31 +98,28 @@ async def process_q3(message: types.Message, state: FSMContext):
     data = await state.get_data()
     
     # Подсчет баллов
-    score = 0
-    if data.get("q1") == QUESTIONS[0]["correct"]:
-        score += 1
-    if data.get("q2") == QUESTIONS[1]["correct"]:
-        score += 1
-    if data.get("q3") == QUESTIONS[2]["correct"]:
-        score += 1
+    score = sum(1 for i in range(3) if data.get(f"q{i+1}") == QUESTIONS[i]["correct"])
 
     await message.answer(f"Тест завершен! Ваш результат: {score} из {len(QUESTIONS)}")
     
     # Сохранение результата в базе данных
     session = SessionLocal()
-    result = TestResult(
-        user_id=str(message.from_user.id),
-        q1=data.get("q1"),
-        q2=data.get("q2"),
-        q3=data.get("q3"),
-        score=score
-    )
-    session.add(result)
-    session.commit()
-    session.close()
-    logging.info("Результат сохранен в базе данных")
-    
-    await state.clear()
+    try:
+        result = TestResult(
+            user_id=str(message.from_user.id),
+            q1=data.get("q1"),
+            q2=data.get("q2"),
+            q3=data.get("q3"),
+            score=score
+        )
+        session.add(result)
+        session.commit()
+        logging.info("✅ Результат сохранен в базе данных")
+    except Exception as e:
+        session.rollback()
+        logging.error(f"❌ Ошибка сохранения в базе: {e}")
+    finally:
+        session.close()
 
 # Основной запуск бота
 if __name__ == "__main__":
