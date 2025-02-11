@@ -3,68 +3,127 @@ import logging
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
-from fastapi import FastAPI
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from dotenv import load_dotenv
-import threading
-import uvicorn
 
-# Настройка логирования
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# Импортируем настройки БД и модель
+from db import SessionLocal, TestResult
 
-# Загрузка переменных окружения
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-
-# Проверяем, загружен ли токен
 if not TOKEN:
-    logging.error("❌ TELEGRAM_BOT_TOKEN не найден! Проверь переменные окружения.")
-    raise ValueError("TELEGRAM_BOT_TOKEN не найден в переменных окружения!")
-logging.info(f"✅ TELEGRAM_BOT_TOKEN загружен, длина: {len(TOKEN)} символов")
+    raise ValueError("Не найден TELEGRAM_BOT_TOKEN в .env файле!")
 
-# Инициализация бота и диспетчера (без аргументов!)
-try:
-    bot = Bot(token=TOKEN)
-    dp = Dispatcher()  # В aiogram v3 Dispatcher создается БЕЗ аргументов
-    logging.info("✅ Бот успешно инициализирован.")
-except Exception as e:
-    logging.error(f"❌ Ошибка инициализации бота: {e}")
-    raise
+logging.basicConfig(level=logging.INFO)
 
-# Регистрация обработчика
-@dp.message(Command("start"))
-async def start_command(message: types.Message):
-    logging.info(f"✅ Получена команда /start от пользователя {message.from_user.id}")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("Начать тест", web_app=WebAppInfo(url="https://your-web-app-url.com"))]
-    ])
-    await message.answer(
-        "Привет! Это бот для технического скрининга.\nНажми кнопку ниже, чтобы начать тест.",
-        reply_markup=keyboard
+# Инициализируем бота, диспетчер и хранилище состояний
+bot = Bot(token=TOKEN)
+storage = MemoryStorage()  # Используем in-memory storage для прототипа
+dp = Dispatcher(storage=storage)
+
+# Определяем состояния для тестирования
+class TestStates(StatesGroup):
+    Q1 = State()  # вопрос 1
+    Q2 = State()  # вопрос 2
+    Q3 = State()  # вопрос 3
+
+# Пример вопросов и правильных ответов
+QUESTIONS = [
+    {
+        "question": "Какой оператор используется для проверки равенства в Python?",
+        "options": ["==", "=", "!="],
+        "correct": "=="
+    },
+    {
+        "question": "Как называется структура данных, которая упорядочивает элементы по ключу?",
+        "options": ["Список", "Словарь", "Множество"],
+        "correct": "Словарь"
+    },
+    {
+        "question": "Какой тип цикла используется для обхода итерируемых объектов в Python?",
+        "options": ["for", "while", "do-while"],
+        "correct": "for"
+    }
+]
+
+# Функция для создания клавиатуры с кнопками из списка вариантов
+def create_keyboard(options: list) -> types.ReplyKeyboardMarkup:
+    # Каждая кнопка создается как объект KeyboardButton, каждая кнопка в отдельном ряду
+    keyboard_buttons = [[types.KeyboardButton(text=option)] for option in options]
+    return types.ReplyKeyboardMarkup(
+        keyboard=keyboard_buttons,
+        resize_keyboard=True,
+        one_time_keyboard=True
     )
 
-# FastAPI-приложение
-app = FastAPI()
+# Обработчик команды /start — начинает тестирование
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "Добро пожаловать на технический скрининг!\n\nПервый вопрос:\n" +
+        QUESTIONS[0]["question"]
+    )
+    keyboard = create_keyboard(QUESTIONS[0]["options"])
+    await message.answer("Выберите ответ:", reply_markup=keyboard)
+    await state.set_state(TestStates.Q1)
 
-@app.get("/")
-async def root():
-    return {"status": "OK", "message": "FastAPI работает"}
+# Обработка первого вопроса
+@dp.message(TestStates.Q1)
+async def process_q1(message: types.Message, state: FSMContext):
+    answer = message.text.strip()
+    await state.update_data(q1=answer)
+    await message.answer("Второй вопрос:\n" + QUESTIONS[1]["question"])
+    keyboard = create_keyboard(QUESTIONS[1]["options"])
+    await message.answer("Выберите ответ:", reply_markup=keyboard)
+    await state.set_state(TestStates.Q2)
 
-# Функция запуска бота (aiogram v3)
-async def start_bot():
-    try:
-        logging.info("🚀 Запуск бота...")
-        await dp.start_polling(bot)
-    except Exception as e:
-        logging.error(f"❌ Бот завершился с ошибкой: {e}")
-        raise
+# Обработка второго вопроса
+@dp.message(TestStates.Q2)
+async def process_q2(message: types.Message, state: FSMContext):
+    answer = message.text.strip()
+    await state.update_data(q2=answer)
+    await message.answer("Третий вопрос:\n" + QUESTIONS[2]["question"])
+    keyboard = create_keyboard(QUESTIONS[2]["options"])
+    await message.answer("Выберите ответ:", reply_markup=keyboard)
+    await state.set_state(TestStates.Q3)
 
-if __name__ == "__main__":
-    logging.info("🔥 Стартуем FastAPI и бота...")
-
-    # Запускаем бота в фоне
-    bot_thread = threading.Thread(target=asyncio.run, args=(start_bot(),), daemon=True)
-    bot_thread.start()
+# Обработка третьего вопроса и подведение итогов
+@dp.message(TestStates.Q3)
+async def process_q3(message: types.Message, state: FSMContext):
+    answer = message.text.strip()
+    await state.update_data(q3=answer)
+    data = await state.get_data()
     
-    # Запускаем FastAPI через uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Подсчет баллов
+    score = 0
+    if data.get("q1") == QUESTIONS[0]["correct"]:
+        score += 1
+    if data.get("q2") == QUESTIONS[1]["correct"]:
+        score += 1
+    if data.get("q3") == QUESTIONS[2]["correct"]:
+        score += 1
+
+    await message.answer(f"Тест завершен! Ваш результат: {score} из {len(QUESTIONS)}")
+    
+    # Сохранение результата в базе данных
+    session = SessionLocal()
+    result = TestResult(
+        user_id=str(message.from_user.id),
+        q1=data.get("q1"),
+        q2=data.get("q2"),
+        q3=data.get("q3"),
+        score=score
+    )
+    session.add(result)
+    session.commit()
+    session.close()
+    logging.info("Результат сохранен в базе данных")
+    
+    await state.clear()
+
+# Основной запуск бота
+if __name__ == "__main__":
+    asyncio.run(dp.start_polling(bot))
