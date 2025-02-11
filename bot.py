@@ -9,24 +9,33 @@ from dotenv import load_dotenv
 import threading
 import uvicorn
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 # Загрузка переменных окружения
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-if not TOKEN:
-    raise ValueError("❌ Ошибка: TELEGRAM_BOT_TOKEN не найден в переменных окружения!")
-
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
+# Логируем длину токена для проверки
+if TOKEN:
+    logging.info(f"✅ TELEGRAM_BOT_TOKEN загружен, длина: {len(TOKEN)} символов")
+else:
+    logging.error("❌ Ошибка: TELEGRAM_BOT_TOKEN не найден! Проверь переменные окружения.")
+    raise ValueError("TELEGRAM_BOT_TOKEN не найден в переменных окружения!")
 
 # Инициализация бота и диспетчера
-bot = Bot(token=TOKEN)
-dp = Dispatcher(bot)
+try:
+    bot = Bot(token=TOKEN)
+    dp = Dispatcher(bot)
+    logging.info("✅ Бот успешно инициализирован.")
+except Exception as e:
+    logging.error(f"❌ Ошибка инициализации бота: {e}")
+    raise
 
 # Обработчик команды /start
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
-    logging.info(f"Получена команда /start от пользователя {message.from_user.id}")
+    logging.info(f"✅ Получена команда /start от пользователя {message.from_user.id}")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("Начать тест", web_app=WebAppInfo(url="https://your-web-app-url.com"))]
     ])
@@ -44,12 +53,15 @@ async def root():
 
 # Функция для запуска polling бота (aiogram v3)
 def start_bot():
-    asyncio.run(dp.start_polling(bot))
+    try:
+        logging.info("🚀 Запуск бота...")
+        asyncio.run(dp.start_polling(bot))
+    except Exception as e:
+        logging.error(f"❌ Бот завершился с ошибкой: {e}")
+        raise
 
 if __name__ == "__main__":
-    # Запускаем polling бота в отдельном потоке
+    logging.info("🔥 Стартуем FastAPI и бота...")
     bot_thread = threading.Thread(target=start_bot, daemon=True)
     bot_thread.start()
-
-    # Запускаем FastAPI через uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
