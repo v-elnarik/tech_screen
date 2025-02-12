@@ -1,6 +1,8 @@
 import os
 import logging
 import asyncio
+import logging
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -17,6 +19,9 @@ if not TOKEN:
     raise ValueError("Не найден TELEGRAM_BOT_TOKEN в .env файле!")
 
 logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+
+
 
 # Инициализируем бота, диспетчер и хранилище состояний
 bot = Bot(token=TOKEN)
