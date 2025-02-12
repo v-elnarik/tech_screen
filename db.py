@@ -3,17 +3,28 @@ import os
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+# Загружаем URL базы данных из переменных окружения
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("❌ Переменная окружения DATABASE_URL не найдена! Проверь настройки Render.")
 
-
+# Создаем подключение к базе
 engine = create_engine(DATABASE_URL, echo=True, future=True)
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 Base = declarative_base()
 
+# Таблица пользователей (рекрутеров)
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)  # Храним хеш пароля
+
+# Таблица результатов тестирования
 class TestResult(Base):
     __tablename__ = "test_results"
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, index=True)
     q1 = Column(String)
@@ -22,13 +33,14 @@ class TestResult(Base):
     score = Column(Integer)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
 
-# Новая таблица для вопросов
+# Таблица вопросов
 class Question(Base):
     __tablename__ = "questions"
+
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=False)  # Текст вопроса
-    options = Column(Text, nullable=False)  # Варианты ответов, например, в формате JSON или разделенные запятыми
+    options = Column(Text, nullable=False)  # Варианты ответов (JSON или строка)
     correct = Column(String, nullable=False)  # Правильный ответ
 
-# Создаем таблицы (если их ещё нет)
+# Создаем таблицы в базе данных
 Base.metadata.create_all(bind=engine)
