@@ -2,10 +2,11 @@ from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from db import SessionLocal, TestResult, Question, Base, engine
+from db import SessionLocal, TestResult, Question, User, Base, engine
 from pydantic import BaseModel
 from typing import List, Optional
 import datetime
+from passlib.context import CryptContext
 
 # Создаем таблицы, если их еще нет
 Base.metadata.create_all(bind=engine)
@@ -33,7 +34,18 @@ def get_db():
     finally:
         db.close()
 
-# --- Эндпоинты для вопросов ---
+# --- Настройка хеширования паролей ---
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# --- Модели Pydantic ---
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
 class QuestionSchema(BaseModel):
     id: Optional[int]
     text: str
@@ -43,6 +55,42 @@ class QuestionSchema(BaseModel):
     class Config:
         orm_mode = True
 
+class TestResultSchema(BaseModel):
+    id: int
+    user_id: str
+    q1: str
+    q2: str
+    q3: str
+    score: int
+    timestamp: datetime.datetime
+
+    class Config:
+        orm_mode = True
+
+# --- Эндпоинты авторизации ---
+@app.post("/register")
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    existing_user = db.query(User).filter(User.username == user.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="❌ Пользователь уже существует!")
+
+    hashed_password = pwd_context.hash(user.password)
+    new_user = User(username=user.username, password_hash=hashed_password)
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"message": "✅ Пользователь зарегистрирован!"}
+
+@app.post("/login")
+def login(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if not db_user or not pwd_context.verify(user.password, db_user.password_hash):
+        raise HTTPException(status_code=401, detail="❌ Неверный логин или пароль")
+
+    return {"message": "✅ Успешный вход!", "username": db_user.username}
+
+# --- Эндпоинты для вопросов ---
 @app.get("/questions", response_model=List[QuestionSchema])
 def read_questions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     questions = db.query(Question).offset(skip).limit(limit).all()
@@ -85,20 +133,6 @@ def delete_question(question_id: int, db: Session = Depends(get_db)):
     return {"detail": "Question deleted"}
 
 # --- Эндпоинты для результатов тестирования ---
-class TestResultSchema(BaseModel):
-    id: int
-    user_id: str
-    q1: str
-    q2: str
-    q3: str
-    score: int
-    timestamp: datetime.datetime
-
-    class Config:
-        orm_mode = True
-
-
-        
 @app.get("/results", response_model=List[TestResultSchema])
 def read_results(
     skip: int = 0,
@@ -113,30 +147,19 @@ def read_results(
 ):
     query = db.query(TestResult)
     
-    # Фильтрация по баллам
     if min_score is not None:
         query = query.filter(TestResult.score >= min_score)
     if max_score is not None:
         query = query.filter(TestResult.score <= max_score)
     
-    # Фильтрация по дате
     if start_date is not None:
-        # Преобразуем дату в datetime, задавая начало дня
         query = query.filter(TestResult.timestamp >= datetime.datetime.combine(start_date, datetime.time.min))
     if end_date is not None:
-        # Фильтруем до конца дня
         query = query.filter(TestResult.timestamp <= datetime.datetime.combine(end_date, datetime.time.max))
     
-    # Сортировка
-    sort_column = TestResult.timestamp  # по умолчанию сортировка по времени
-    if sort_by == "score":
-        sort_column = TestResult.score
-    
-    if order == "asc":
-        query = query.order_by(sort_column.asc())
-    else:
-        query = query.order_by(sort_column.desc())
-    
+    sort_column = TestResult.timestamp if sort_by == "timestamp" else TestResult.score
+    query = query.order_by(sort_column.asc() if order == "asc" else sort_column.desc())
+
     results = query.offset(skip).limit(limit).all()
     return results
 
